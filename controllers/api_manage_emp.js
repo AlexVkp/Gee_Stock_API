@@ -33,12 +33,9 @@ exports.select_all_emp = (req, res, next) => {
         let sql = `
             SELECT 
                 e.emp_id, e.emp_name, e.emp_lname, e.gender, e.date_of_b, 
-                p.province_name, d.district_name, v.village_name, 
-                e.tel, e.start_date, e.username, e.status, e.active
+                e.tel, e.address, e.start_date, e.username, e.status, e.active
             FROM employee e
-            LEFT JOIN province p ON e.province_id = p.province_id
-            LEFT JOIN district d ON e.district_id = d.district_id
-            LEFT JOIN village v ON e.village_id = v.village_id
+            
         `;
 
         connection_final.query(sql, [], (err, results, fields) => {
@@ -67,14 +64,10 @@ exports.select_emp_with_id = (req, res, next) => {
         try {
             connection_final.query(
                 `
-            SELECT 
+             SELECT 
                 e.emp_id, e.emp_name, e.emp_lname, e.gender, e.date_of_b, 
-                p.province_name, d.district_name, v.village_name, 
-                e.tel, e.start_date, e.username, e.status, e.active
+                e.tel, e.address, e.start_date, e.username, e.status, e.active
             FROM employee e
-            LEFT JOIN province p ON e.province_id = p.province_id
-            LEFT JOIN district d ON e.district_id = d.district_id
-            LEFT JOIN village v ON e.village_id = v.village_id
             where emp_id = ?
         `,
                 [_empID],
@@ -102,16 +95,74 @@ exports.select_emp_with_id = (req, res, next) => {
 }
 
 
+exports.search_employee = (req, res, next) => {
+    const { keyword } = req.body;
+
+    if (!keyword) {
+        return res.status(400).json({ result: "Keyword is required" });
+    }
+
+    try {
+        const searchQuery = `
+            SELECT 
+                e.emp_id, e.emp_name, e.emp_lname, e.gender, e.date_of_b, 
+                e.tel, e.address, e.start_date, e.username, e.status, e.active
+            FROM employee e
+            WHERE 
+                e.emp_id LIKE ? OR
+                e.emp_name LIKE ? OR
+                e.emp_lname LIKE ? OR
+                e.gender LIKE ? OR
+                e.date_of_b LIKE ? OR
+                e.tel LIKE ? OR
+                e.address LIKE ? OR
+                e.start_date LIKE ? OR
+                e.username LIKE ? OR
+                e.status LIKE ? OR
+                e.active LIKE ?
+        `;
+
+        const searchValue = `%${keyword}%`;
+
+        // ใส่ searchValue ทั้งหมด 11 ครั้ง ให้ตรงกับจำนวน field
+        const values = new Array(11).fill(searchValue);
+
+        connection_final.query(
+            searchQuery,
+            values,
+            (err, results) => {
+                if (err) {
+                    console.error("Database search error:", err);
+                    return res.status(500).json({ result: "Database Error" });
+                }
+
+                res.status(200).json({
+                    result_code: "200",
+                    result: "Search completed",
+                    user_info: results
+                });
+            }
+        );
+    } catch (error) {
+        console.error("Search function error:", error);
+        res.status(500).json({ result: "Internal Server Error" });
+    }
+};
+
+
+
+
+
 exports.insert_employee = async (req, res, next) => {
     let { 
         emp_id, emp_name, emp_lname, gender, date_of_b, 
-        province_id, district_id, village_id, tel, start_date, 
+        tel, address, start_date, 
         username, password, status, active 
     } = req.body;
 
     // Validate required fields
-    if (!emp_id || !emp_name || !emp_lname || !gender || !date_of_b || 
-        !province_id || !district_id || !village_id || !tel || !start_date || 
+    if (!emp_name || !emp_lname || !gender || !date_of_b || 
+        !tel || !address || !start_date || 
         !username || !password || !status || active === undefined) {
         return res.status(400).json({ "result": "All fields are required" });
     }
@@ -122,13 +173,13 @@ exports.insert_employee = async (req, res, next) => {
 
         let sql = `INSERT INTO employee 
             (emp_id, emp_name, emp_lname, gender, date_of_b, 
-             province_id, district_id, village_id, tel, start_date, 
+            tel, address, start_date, 
              username, password, status, active) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         let values = [
             emp_id, emp_name, emp_lname, gender, date_of_b, 
-            province_id, district_id, village_id, tel, start_date, 
+            tel, address, start_date, 
             username, hashedPassword, status, active
         ];
 
@@ -156,7 +207,7 @@ exports.insert_employee = async (req, res, next) => {
 exports.update_employee = async (req, res, next) => {
     let { 
         emp_id, emp_name, emp_lname, gender, date_of_b, 
-        province_id, district_id, village_id, tel, start_date, 
+        tel, address, start_date, 
         username, password, status, active 
     } = req.body;
 
@@ -174,10 +225,8 @@ exports.update_employee = async (req, res, next) => {
         if (emp_lname) { updateFields.push("emp_lname = ?"); values.push(emp_lname); }
         if (gender) { updateFields.push("gender = ?"); values.push(gender); }
         if (date_of_b) { updateFields.push("date_of_b = ?"); values.push(date_of_b); }
-        if (province_id) { updateFields.push("province_id = ?"); values.push(province_id); }
-        if (district_id) { updateFields.push("district_id = ?"); values.push(district_id); }
-        if (village_id) { updateFields.push("village_id = ?"); values.push(village_id); }
         if (tel) { updateFields.push("tel = ?"); values.push(tel); }
+        if (address) { updateFields.push("address = ?"); values.push(address); }
         if (start_date) { updateFields.push("start_date = ?"); values.push(start_date); }
         if (username) { updateFields.push("username = ?"); values.push(username); }
         if (status) { updateFields.push("status = ?"); values.push(status); }
@@ -226,16 +275,16 @@ exports.update_employee = async (req, res, next) => {
 
 
 exports.delete_employee = (req, res, next) => {
-    let { emp_id } = req.body;  // Get the emp_id from the request body
+    let { emp_id } = req.body;  
 
     if (!emp_id) {
         return res.status(400).json({ "result": "Missing emp_id parameter" });
     }
 
-    console.log("Received emp_id:", emp_id); // Debug log to check received emp_id
+    console.log("Received emp_id:", emp_id); 
 
     try {
-        // Step 1: Delete the employee based on emp_id
+        
         connection_final.query(
             'DELETE FROM employee WHERE emp_id = ?',
             [emp_id],
@@ -262,3 +311,73 @@ exports.delete_employee = (req, res, next) => {
     }
 };
 
+
+
+exports.login_employee = async (req, res, next) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ result: "Username and password are required" });
+    }
+
+    try {
+        const sql = `SELECT * FROM employee WHERE username = ? LIMIT 1`;
+        connection_final.query(sql, [username], async (err, results) => {
+            if (err) {
+                console.error("Database Error:", err);
+                return res.status(500).json({ result: "Database Error" });
+            }
+
+            if (results.length === 0) {
+                console.log("User not found:", username);
+                return res.status(401).json({ result: "Invalid username or password" });
+            }
+
+            const user = results[0];
+
+            // ตรวจสอบว่า account นี้ถูกเปิดใช้งานหรือไม่
+            if (user.active !== 1) {
+                console.log("Account inactive:", username);
+                return res.status(403).json({ result: "This account is inactive" });
+            }
+
+            // เปรียบเทียบรหัสผ่านที่กรอกกับรหัสผ่านที่เก็บไว้ในฐานข้อมูล
+            console.log("Entered password:", password);
+            console.log("Stored hashed password:", user.password);
+
+            const isMatch = await bcrypt.compare(password, user.password);
+            console.log('Password Match:', isMatch);
+
+            if (!isMatch) {
+                console.log("Password mismatch!");
+                return res.status(401).json({ result: "Invalid username or password" });
+            }
+
+            // ถ้าทุกอย่างถูกต้อง ส่งข้อมูลกลับ
+            res.status(200).json({
+                result_code: "200",
+                result: "Login successful",
+                employee: {
+                    emp_id: user.emp_id,
+                    emp_name: user.emp_name,
+                    emp_lname: user.emp_lname,
+                    status: user.status,
+                    active: user.active
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Login Error:", error);
+        res.status(500).json({ result: "Server Error" });
+    }
+};
+
+
+
+    
+
+
+// const plaintext = '9999'; // สมมุติรหัสที่คุณกรอก
+// const hashed = '$2b$10$VkckeSXOn6C6v/Snct'; // คัดลอกจากฐานข้อมูล
+
+// bcrypt.compare(plaintext, hashed).then(console.log); // true หรือ false

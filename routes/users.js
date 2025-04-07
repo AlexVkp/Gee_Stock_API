@@ -9,9 +9,11 @@ const api_customer= require("../controllers/api_customer");
 // EMP Route 
 router.get('/All/Employee', api_manage_emp.select_all_emp);
 router.post('/Employee/With/ID', api_manage_emp.select_emp_with_id);
+router.post('/search/Employee', api_manage_emp.search_employee);
 router.post('/Insert/Emp', api_manage_emp.insert_employee);
 router.put('/Update/Emp', api_manage_emp.update_employee)
 router.delete('/Delete/Emp', api_manage_emp.delete_employee);
+router.post('/Login/Emp', api_manage_emp.login_employee);
 
 // Supplier Route
 router.get('/All/Supplier', api_supplier.select_all_supplier);
