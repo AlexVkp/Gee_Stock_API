@@ -120,8 +120,8 @@ exports.delete_order = (req, res, next) => {
 exports.select_all_order_detail = (req, res, next) => {
     try {
         connection_final.query(
-            `SELECT od.order_d_id, p.ProductName, od.order_id, od.qty FROM order_detail
-            LEFT JOIN product p ON od.pro_id = p.pro_id`,
+            `SELECT od.order_d_id, p.ProductName, od.order_id, od.qty FROM order_detail od
+            LEFT JOIN products p ON od.proid = p.proid`,
             [],
             (err, results, fields) => {
                 if (err) {
@@ -215,12 +215,12 @@ exports.select_orders = (req, res, next) => {
     try {
         let sql = `
             SELECT o.order_id, o.order_date, s.sup_name, e.emp_name,
-                   od.pro_id, p.ProductName, od.qty
+                   od.proid, p.ProductName, od.qty
             FROM orders o
             JOIN suppliers s ON o.sup_id = s.sup_id
             JOIN employees e ON o.emp_id = e.emp_id
             JOIN order_detail od ON o.order_id = od.order_id
-            JOIN products p ON od.pro_id = p.proid
+            JOIN products p ON od.proid = p.proid
         `;
 
         connection_final.query(sql, [], (err, results) => {
@@ -242,47 +242,47 @@ exports.select_orders = (req, res, next) => {
 };
 
 
-exports.insert_orders = (req, res, next) => {
-    let { sup_id, emp_id, order_date, products } = req.body; // `products` คือ array ของสินค้า
-
-    if (!sup_id || !emp_id || !order_date || !Array.isArray(products) || products.length === 0) {
-        return res.status(400).json({ "result": "Missing required fields or products" });
+exports.insert_orders = async (req, res) => {
+    const { sup_id, emp_id, items } = req.body;
+  
+    if (!sup_id || !emp_id || !items || items.length === 0) {
+      return res.status(400).json({ result: "Invalid data" });
     }
-
+  
+    const order_date = new Date().toISOString().split("T")[0];
+  
+    const conn = await connection.getConnection();
     try {
-        // เพิ่มคำสั่งซื้อในตาราง `order`
-        let insertOrderQuery = `INSERT INTO orders (sup_id, emp_id, order_date) VALUES (?, ?, ?)`;
-        connection_final.query(insertOrderQuery, [sup_id, emp_id, order_date], (err, orderResult) => {
-            if (err) {
-                console.error("Database Error:", err);
-                return res.status(500).json({ "result": "Database Error" });
-            }
-
-            let order_id = orderResult.insertId; // ดึง `order_id` ที่ถูกสร้างขึ้น
-
-            // เพิ่มสินค้าใน `order_detail`
-            let insertDetailQuery = `INSERT INTO order_detail (pro_id, order_id, qty) VALUES ?`;
-            let detailValues = products.map(p => [p.pro_id, order_id, p.qty]);
-
-            connection_final.query(insertDetailQuery, [detailValues], (err, detailResult) => {
-                if (err) {
-                    console.error("Database Error:", err);
-                    return res.status(500).json({ "result": "Database Error" });
-                }
-
-                res.status(201).json({
-                    "result_code": "201",
-                    "result": "Order Created Successfully",
-                    "order_id": order_id
-                });
-            });
-        });
-
-    } catch (error) {
-        console.error("Error:", error);
-        res.status(500).json({ "result": "Internal Server Error" });
+      await conn.beginTransaction();
+  
+      // Insert order
+      const [orderResult] = await conn.execute(
+        "INSERT INTO `orders` (sup_id, emp_id, order_date) VALUES (?, ?, ?)",
+        [sup_id, emp_id, order_date]
+      );
+      const order_id = orderResult.insertId;
+  
+      // Insert order details
+      const orderDetailsValues = items.map(item => [item.proid, order_id, item.qty]);
+      await conn.query(
+        "INSERT INTO order_detail (proid, order_id, qty) VALUES ?",
+        [orderDetailsValues]
+      );
+  
+      await conn.commit();
+      res.status(200).json({ result: "Order saved successfully", order_id });
+  
+    } catch (err) {
+      await conn.rollback();
+      console.error(err);
+      res.status(500).json({ result: "Order save failed", error: err });
+    } finally {
+      conn.release();
     }
-};
+  };
+  
+  
+
 
 
 exports.update_orders = (req, res, next) => {
